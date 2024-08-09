@@ -79,7 +79,44 @@ app.delete('/api/data/:id', async (req, res) => {
     }
 });
 
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
+
+// Pretpostavimo da imate User model kao što je prethodno opisano
+
+app.post('/api/register', async (req, res) => {
+    const { username, password } = req.body;
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newUser = new User({ username, password: hashedPassword });
+    try {
+        await newUser.save();
+        res.status(201).send({ message: 'User registered' });
+    } catch (error) {
+        res.status(400).send(error);
+    }
+});
+
+app.post('/api/login', async (req, res) => {
+    const { username, password } = req.body;
+    const user = await User.findOne({ username });
+
+    if (!user) {
+        return res.status(400).send({ message: 'User not found' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+        return res.status(400).send({ message: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    res.send({ token });
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
+
