@@ -11,11 +11,22 @@ app.use(bodyParser.json());
 app.use(cors());
 
 const dbUri = process.env.MONGODB_URI;
+
 mongoose.connect(dbUri)
-    .then(() => console.log('MongoDB connected'))
-    .catch(err => console.error('MongoDB connection error:', err));
+    .then(() => {
+        console.log('MongoDB connected');
+    })
+    .catch((err) => {
+        console.error('MongoDB connection error:', err);
+    });
 
 const Schema = mongoose.Schema;
+const DataSchema = new Schema({
+    field1: String,
+    field2: String,
+});
+
+const Data = mongoose.model('Data', DataSchema);
 
 const UserSchema = new Schema({
     username: { type: String, required: true, unique: true },
@@ -35,14 +46,6 @@ UserSchema.methods.matchPassword = async function(password) {
 
 const User = mongoose.model('User', UserSchema);
 
-const DataSchema = new Schema({
-    field1: String,
-    field2: String,
-});
-
-const Data = mongoose.model('Data', DataSchema);
-
-// Middleware za verifikaciju JWT tokena
 const protect = (req, res, next) => {
     const token = req.headers['authorization']?.split(' ')[1];
     if (!token) return res.status(401).send({ message: 'No token provided' });
@@ -54,7 +57,6 @@ const protect = (req, res, next) => {
     });
 };
 
-// Registracija korisnika
 app.post('/api/register', async (req, res) => {
     const { username, password } = req.body;
     try {
@@ -66,7 +68,6 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
-// Prijava korisnika
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
     try {
@@ -81,7 +82,6 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// Zaštićena ruta za pristup podacima
 app.get('/api/data', protect, async (req, res) => {
     try {
         const data = await Data.find();
@@ -95,32 +95,6 @@ app.get('/api/data', protect, async (req, res) => {
         res.status(200).send(data);
     } catch (error) {
         res.status(500).send(error);
-    }
-});
-
-app.post('/api/data', protect, async (req, res) => {
-    const newData = new Data(req.body);
-    try {
-        await newData.save();
-        res.status(201).send(newData);
-    } catch (error) {
-        res.status(400).send(error);
-    }
-});
-
-app.delete('/api/data/:id', protect, async (req, res) => {
-    const { id } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(400).send({ message: 'Invalid ID format' });
-    }
-    try {
-        const deletedData = await Data.findByIdAndDelete(id);
-        if (!deletedData) {
-            return res.status(404).send({ message: 'Data not found' });
-        }
-        res.status(200).send(deletedData);
-    } catch (error) {
-        res.status(500).send({ message: 'Internal server error' });
     }
 });
 
