@@ -109,6 +109,43 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
+app.get('/api/register', async (req, res) => {
+    const { username, password } = req.query;
+    if (!username || !password) {
+        return res.status(400).send({ message: 'Username and password are required' });
+    }
+
+    try {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newUser = new User({ username, password: hashedPassword });
+        await newUser.save();
+        res.status(201).send({ message: 'User registered' });
+    } catch (error) {
+        res.status(400).send({ message: 'Error registering user', error });
+    }
+});
+
+app.get('/api/login', async (req, res) => {
+    const { username, password } = req.query;
+    if (!username || !password) {
+        return res.status(400).send({ message: 'Username and password are required' });
+    }
+
+    try {
+        const user = await User.findOne({ username });
+        if (!user) return res.status(400).send({ message: 'User not found' });
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) return res.status(400).send({ message: 'Invalid credentials' });
+
+        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        res.send({ token });
+    } catch (error) {
+        res.status(500).send({ message: 'Error logging in', error });
+    }
+});
+
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
