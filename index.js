@@ -3,6 +3,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 
 const app = express();
 
@@ -25,9 +27,72 @@ const DataSchema = new Schema({
     field2: String,
 });
 
-const Data = mongoose.model('Data', DataSchema);
+const UserSchema = new Schema({
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+});
 
-app.post('/api/data', async (req, res) => {
+const Data = mongoose.model('Data', DataSchema);
+const User = mongoose.model('User', UserSchema);
+
+// Register route
+app.post('/api/register', async (req, res) => {
+    const { username, password } = req.body;
+    try {
+        const existingUser = await User.findOne({ username });
+        if (existingUser) {
+            return res.status(400).send({ message: 'User already exists' });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newUser = new User({ username, password: hashedPassword });
+        await newUser.save();
+
+        res.status(201).send({ message: 'User registered successfully' });
+    } catch (error) {
+        res.status(500).send({ message: 'Error registering user', error });
+    }
+});
+
+// Login route
+app.post('/api/login', async (req, res) => {
+    const { username, password } = req.body;
+    try {
+        const user = await User.findOne({ username });
+        if (!user) {
+            return res.status(400).send({ message: 'User not found' });
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(400).send({ message: 'Invalid credentials' });
+        }
+
+        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        res.status(200).send({ token });
+    } catch (error) {
+        res.status(500).send({ message: 'Error logging in', error });
+    }
+});
+
+// Protecting routes with middleware
+const authenticateToken = (req, res, next) => {
+    const token = req.header('Authorization').replace('Bearer ', '');
+    if (!token) {
+        return res.status(401).send({ message: 'Access denied. No token provided.' });
+    }
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = decoded;
+        next();
+    } catch (error) {
+        res.status(400).send({ message: 'Invalid token' });
+    }
+};
+
+// Protected data routes
+app.post('/api/data', authenticateToken, async (req, res) => {
     const newData = new Data(req.body);
     try {
         await newData.save();
@@ -37,29 +102,19 @@ app.post('/api/data', async (req, res) => {
     }
 });
 
-app.get('/api/data', async (req, res) => {
+app.get('/api/data', authenticateToken, async (req, res) => {
     try {
         const data = await Data.find();
-        if (data.length === 0) {
-            const defaultData = [
-                { field1: 'Default Field 1 - 1', field2: 'Default Field 2 - 1' },
-                { field1: 'Default Field 1 - 2', field2: 'Default Field 2 - 2' },
-            ];
-            return res.status(200).send(defaultData);
-        }
         res.status(200).send(data);
     } catch (error) {
         res.status(500).send(error);
     }
 });
 
-app.delete('/api/data/:id', async (req, res) => {
+app.delete('/api/data/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
 
-    console.log(`Received request to delete item with ID: ${id}`);
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
-        console.error(`Invalid ObjectId format: ${id}`);
         return res.status(400).send({ message: 'Invalid ID format' });
     }
 
@@ -67,14 +122,11 @@ app.delete('/api/data/:id', async (req, res) => {
         const deletedData = await Data.findByIdAndDelete(id);
 
         if (!deletedData) {
-            console.error(`Item with ID: ${id} not found`);
             return res.status(404).send({ message: 'Data not found' });
         }
 
-        console.log(`Item with ID: ${id} successfully deleted`);
         return res.status(200).send(deletedData);
     } catch (error) {
-        console.error('Error deleting data:', error);
         return res.status(500).send({ message: 'Internal server error' });
     }
 });
