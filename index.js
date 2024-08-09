@@ -1,138 +1,85 @@
-require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
+
+require('dotenv').config();
 
 const app = express();
-
 app.use(bodyParser.json());
 app.use(cors());
 
 const dbUri = process.env.MONGODB_URI;
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
 
 mongoose.connect(dbUri)
-    .then(() => {
-        console.log('MongoDB connected');
-    })
-    .catch((err) => {
-        console.error('MongoDB connection error:', err);
-    });
+    .then(() => console.log('MongoDB connected'))
+    .catch((err) => console.error('MongoDB connection error:', err));
 
-const Schema = mongoose.Schema;
-
-// Data Schema
-const DataSchema = new Schema({
-    field1: String,
-    field2: String,
-});
-
-const Data = mongoose.model('Data', DataSchema);
-
-// User Schema
-const UserSchema = new Schema({
-    username: String,
-    password: String,
+const UserSchema = new mongoose.Schema({
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
 });
 
 const User = mongoose.model('User', UserSchema);
 
-// Middleware za provjeru JWT tokena
-const authenticateToken = (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    if (!token) return res.sendStatus(401);
-
-    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-        if (err) return res.sendStatus(403);
-        req.user = user;
-        next();
-    });
-};
-
-// API Ruta za registraciju
+// Register
 app.post('/api/register', async (req, res) => {
+    const { username, password } = req.body;
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
     try {
-        const hashedPassword = await bcrypt.hash(req.body.password, 10);
-        const newUser = new User({
-            username: req.body.username,
-            password: hashedPassword,
-        });
-        await newUser.save();
+        const user = new User({ username, password: hashedPassword });
+        await user.save();
         res.status(201).send({ message: 'User registered successfully' });
     } catch (error) {
-        res.status(500).send({ message: 'Error registering user', error });
+        res.status(400).send({ message: 'Error registering user', error });
     }
 });
 
-// API Ruta za login
+// Login
 app.post('/api/login', async (req, res) => {
-    const user = await User.findOne({ username: req.body.username });
-    if (!user) return res.status(400).send({ message: 'Cannot find user' });
+    const { username, password } = req.body;
 
     try {
-        if (await bcrypt.compare(req.body.password, user.password)) {
-            const userId = { id: user._id };
-            const token = jwt.sign(userId, process.env.JWT_SECRET, { expiresIn: '1h' });
-            res.status(200).send({ message: 'Login successful', token });
-        } else {
-            res.status(403).send({ message: 'Invalid password' });
+        const user = await User.findOne({ username });
+
+        if (!user || !await bcrypt.compare(password, user.password)) {
+            return res.status(401).send({ message: 'Invalid credentials' });
         }
-    } catch {
-        res.status(500).send({ message: 'Error logging in' });
+
+        const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '1h' });
+
+        res.status(200).send({ message: 'Login successful', token });
+    } catch (error) {
+        res.status(500).send({ message: 'Error logging in', error });
     }
 });
 
-// API Ruta za dodavanje podataka (zaštićena autentifikacijom)
-app.post('/api/data', authenticateToken, async (req, res) => {
-    const newData = new Data(req.body);
-    try {
-        await newData.save();
-        res.status(201).send(newData);
-    } catch (error) {
-        res.status(400).send(error);
-    }
-});
+// Middleware to protect routes
+const authenticateToken = (req, res, next) => {
+    const token = req.header('Authorization')?.split(' ')[1];
 
-// API Ruta za čitanje podataka (zaštićena autentifikacijom)
-app.get('/api/data', authenticateToken, async (req, res) => {
-    try {
-        const data = await Data.find();
-        if (data.length === 0) {
-            const defaultData = [
-                { field1: 'Default Field 1 - 1', field2: 'Default Field 2 - 1' },
-                { field1: 'Default Field 1 - 2', field2: 'Default Field 2 - 2' },
-            ];
-            return res.status(200).send(defaultData);
-        }
-        res.status(200).send(data);
-    } catch (error) {
-        res.status(500).send(error);
-    }
-});
-
-// API Ruta za brisanje podataka (zaštićena autentifikacijom)
-app.delete('/api/data/:id', authenticateToken, async (req, res) => {
-    const { id } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(400).send({ message: 'Invalid ID format' });
+    if (!token) {
+        return res.status(401).send({ message: 'No token provided' });
     }
 
     try {
-        const deletedData = await Data.findByIdAndDelete(id);
-        if (!deletedData) {
-            return res.status(404).send({ message: 'Data not found' });
-        }
-        res.status(200).send(deletedData);
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.user = decoded;
+        next();
     } catch (error) {
-        res.status(500).send({ message: 'Internal server error' });
+        res.status(403).send({ message: 'Invalid token' });
     }
+};
+
+// Example of a protected route
+app.get('/api/protected', authenticateToken, (req, res) => {
+    res.status(200).send({ message: 'This is a protected route', userId: req.user.userId });
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
