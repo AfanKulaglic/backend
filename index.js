@@ -3,23 +3,38 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 
 const app = express();
-
 app.use(bodyParser.json());
 app.use(cors());
 
 const dbUri = process.env.MONGODB_URI;
-
 mongoose.connect(dbUri)
-    .then(() => {
-        console.log('MongoDB connected');
-    })
-    .catch((err) => {
-        console.error('MongoDB connection error:', err);
-    });
+    .then(() => console.log('MongoDB connected'))
+    .catch(err => console.error('MongoDB connection error:', err));
 
 const Schema = mongoose.Schema;
+
+const UserSchema = new Schema({
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true }
+});
+
+UserSchema.pre('save', async function(next) {
+    if (!this.isModified('password')) return next();
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+});
+
+UserSchema.methods.matchPassword = async function(password) {
+    return await bcrypt.compare(password, this.password);
+};
+
+const User = mongoose.model('User', UserSchema);
+
 const DataSchema = new Schema({
     field1: String,
     field2: String,
@@ -27,17 +42,47 @@ const DataSchema = new Schema({
 
 const Data = mongoose.model('Data', DataSchema);
 
-app.post('/api/data', async (req, res) => {
-    const newData = new Data(req.body);
+// Middleware za verifikaciju JWT tokena
+const protect = (req, res, next) => {
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.status(401).send({ message: 'No token provided' });
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+        if (err) return res.status(403).send({ message: 'Invalid token' });
+        req.user = decoded;
+        next();
+    });
+};
+
+// Registracija korisnika
+app.post('/api/register', async (req, res) => {
+    const { username, password } = req.body;
     try {
-        await newData.save();
-        res.status(201).send(newData);
+        const user = new User({ username, password });
+        await user.save();
+        res.status(201).send({ message: 'User registered' });
     } catch (error) {
         res.status(400).send(error);
     }
 });
 
-app.get('/api/data', async (req, res) => {
+// Prijava korisnika
+app.post('/api/login', async (req, res) => {
+    const { username, password } = req.body;
+    try {
+        const user = await User.findOne({ username });
+        if (!user || !(await user.matchPassword(password))) {
+            return res.status(401).send({ message: 'Invalid credentials' });
+        }
+        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        res.status(200).send({ token });
+    } catch (error) {
+        res.status(500).send(error);
+    }
+});
+
+// Zaštićena ruta za pristup podacima
+app.get('/api/data', protect, async (req, res) => {
     try {
         const data = await Data.find();
         if (data.length === 0) {
@@ -53,29 +98,29 @@ app.get('/api/data', async (req, res) => {
     }
 });
 
-app.delete('/api/data/:id', async (req, res) => {
+app.post('/api/data', protect, async (req, res) => {
+    const newData = new Data(req.body);
+    try {
+        await newData.save();
+        res.status(201).send(newData);
+    } catch (error) {
+        res.status(400).send(error);
+    }
+});
+
+app.delete('/api/data/:id', protect, async (req, res) => {
     const { id } = req.params;
-
-    console.log(`Received request to delete item with ID: ${id}`);
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
-        console.error(`Invalid ObjectId format: ${id}`);
         return res.status(400).send({ message: 'Invalid ID format' });
     }
-
     try {
         const deletedData = await Data.findByIdAndDelete(id);
-
         if (!deletedData) {
-            console.error(`Item with ID: ${id} not found`);
             return res.status(404).send({ message: 'Data not found' });
         }
-
-        console.log(`Item with ID: ${id} successfully deleted`);
-        return res.status(200).send(deletedData);
+        res.status(200).send(deletedData);
     } catch (error) {
-        console.error('Error deleting data:', error);
-        return res.status(500).send({ message: 'Internal server error' });
+        res.status(500).send({ message: 'Internal server error' });
     }
 });
 
