@@ -11,12 +11,14 @@ const app = express();
 app.use(bodyParser.json());
 app.use(cors());
 
+// MongoDB Connection
 const dbUri = process.env.MONGODB_URI;
 
 mongoose.connect(dbUri)
     .then(() => console.log('MongoDB connected'))
     .catch((err) => console.error('MongoDB connection error:', err));
 
+// Define Schemas and Models
 const Schema = mongoose.Schema;
 
 const DataSchema = new Schema({
@@ -33,6 +35,7 @@ const UserSchema = new Schema({
 
 const User = mongoose.model('User', UserSchema);
 
+// Data Routes
 app.post('/api/data', async (req, res) => {
     const newData = new Data(req.body);
     try {
@@ -62,28 +65,22 @@ app.get('/api/data', async (req, res) => {
 app.delete('/api/data/:id', async (req, res) => {
     const { id } = req.params;
 
-    console.log(`Received request to delete item with ID: ${id}`);
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
-        console.error(`Invalid ObjectId format: ${id}`);
         return res.status(400).send({ message: 'Invalid ID format' });
     }
 
     try {
         const deletedData = await Data.findByIdAndDelete(id);
         if (!deletedData) {
-            console.error(`Item with ID: ${id} not found`);
             return res.status(404).send({ message: 'Data not found' });
         }
-
-        console.log(`Item with ID: ${id} successfully deleted`);
-        return res.status(200).send(deletedData);
+        res.status(200).send(deletedData);
     } catch (error) {
-        console.error('Error deleting data:', error);
-        return res.status(500).send({ message: 'Internal server error', error });
+        res.status(500).send({ message: 'Error deleting data', error });
     }
 });
 
+// Authentication Routes
 app.post('/api/register', async (req, res) => {
     const { username, password } = req.body;
     try {
