@@ -38,27 +38,16 @@ const UserSchema = new Schema({
 
 const User = mongoose.model('User', UserSchema);
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'uploads/');
-    },
-    filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname));
-    }
-});
-
-const upload = multer({ storage });
-
-// Route for uploading image
-app.post('/api/data', upload.single('image'), async (req, res) => {
+// Data Routes
+app.post('/api/data', async (req, res) => {
     try {
-        const { nickname } = req.body;
-        const image = req.file ? `/uploads/${req.file.filename}` : null;
+        const { nickname, image } = req.body;
 
         if (!nickname || !image) {
             return res.status(400).send({ message: 'Nickname or image URL is missing' });
         }
 
+        // `image` is the URL in this case
         const newData = new Data({ nickname, image });
         await newData.save();
         res.status(201).send(newData);
@@ -107,9 +96,7 @@ app.delete('/api/data/:id', async (req, res) => {
     }
 });
 
-// Authentication Rou
-
-// Registration Route
+// Authentication Routes
 app.post('/api/register', async (req, res) => {
     const { username, password } = req.body;
     try {
@@ -122,7 +109,6 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
-// Login Route
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
     try {
