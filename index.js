@@ -5,6 +5,9 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
 const app = express();
 
@@ -23,6 +26,7 @@ const Schema = mongoose.Schema;
 
 const DataSchema = new Schema({
     nickname: String,
+    image: String, // Path to the stored image file
 });
 
 const Data = mongoose.model('Data', DataSchema);
@@ -34,9 +38,24 @@ const UserSchema = new Schema({
 
 const User = mongoose.model('User', UserSchema);
 
+// Set up Multer for file uploads
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, 'uploads/'); // Store uploads in the 'uploads' directory
+    },
+    filename: function (req, file, cb) {
+        cb(null, Date.now() + path.extname(file.originalname)); // Name the file with a timestamp
+    }
+});
+
+const upload = multer({ storage: storage });
+
 // Data Routes
-app.post('/api/data', async (req, res) => {
-    const newData = new Data(req.body);
+app.post('/api/data', upload.single('image'), async (req, res) => {
+    const { nickname } = req.body;
+    const image = req.file ? req.file.filename : null;
+
+    const newData = new Data({ nickname, image });
     try {
         await newData.save();
         res.status(201).send(newData);
@@ -72,6 +91,14 @@ app.delete('/api/data/:id', async (req, res) => {
         if (!deletedData) {
             return res.status(404).send({ message: 'Data not found' });
         }
+
+        // Delete the associated image file if it exists
+        if (deletedData.image) {
+            fs.unlink(path.join(__dirname, 'uploads', deletedData.image), (err) => {
+                if (err) console.error('Error deleting image file:', err);
+            });
+        }
+
         res.status(200).send(deletedData);
     } catch (error) {
         res.status(500).send({ message: 'Error deleting data', error });
