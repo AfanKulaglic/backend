@@ -51,8 +51,7 @@ app.get('/api/data', async (req, res) => {
         const data = await Data.find();
         if (data.length === 0) {
             const defaultData = [
-                { field1: 'Default Field 1 - 1', field2: 'Default Field 2 - 1' },
-                { field1: 'Default Field 1 - 2', field2: 'Default Field 2 - 2' },
+                { nickname: 'Default Field 1 - 1', f },
             ];
             return res.status(200).send(defaultData);
         }
