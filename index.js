@@ -14,6 +14,14 @@ const app = express();
 app.use(bodyParser.json());
 app.use(cors());
 
+const cors = require('cors');
+app.use(cors({
+  origin: 'http://localhost:5173', // Zamenite sa domenom vašeg frontend-a
+  methods: 'GET, POST, PUT, DELETE',
+  allowedHeaders: 'Content-Type, Authorization'
+}));
+
+
 // MongoDB Connection
 const dbUri = process.env.MONGODB_URI;
 
