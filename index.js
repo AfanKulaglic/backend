@@ -1,4 +1,3 @@
-require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
@@ -22,8 +21,7 @@ mongoose.connect(dbUri)
 const Schema = mongoose.Schema;
 
 const DataSchema = new Schema({
-    field1: String,
-    field2: String,
+    nickname: String,
 });
 
 const Data = mongoose.model('Data', DataSchema);
@@ -37,8 +35,20 @@ const User = mongoose.model('User', UserSchema);
 
 // Data Routes
 app.post('/api/data', async (req, res) => {
-    const newData = new Data({ nickname: req.body.nickname });
+    const { nickname } = req.body;
+    
+    if (!nickname) {
+        return res.status(400).send({ message: 'Nickname is required' });
+    }
+
     try {
+        // Check if nickname already exists
+        const existingData = await Data.findOne({ nickname });
+        if (existingData) {
+            return res.status(400).send({ message: 'Nickname already exists' });
+        }
+
+        const newData = new Data({ nickname });
         await newData.save();
         res.status(201).send(newData);
     } catch (error) {
@@ -62,17 +72,13 @@ app.get('/api/data', async (req, res) => {
     }
 });
 
-app.delete('/api/data/:id', async (req, res) => {
-    const { id } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(400).send({ message: 'Invalid ID format' });
-    }
+app.delete('/api/data/:nickname', async (req, res) => {
+    const { nickname } = req.params;
 
     try {
-        const deletedData = await Data.findByIdAndDelete(id);
+        const deletedData = await Data.findOneAndDelete({ nickname });
         if (!deletedData) {
-            return res.status(404).send({ message: 'Data not found' });
+            return res.status(404).send({ message: 'Nickname not found' });
         }
         res.status(200).send(deletedData);
     } catch (error) {
