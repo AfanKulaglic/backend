@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
@@ -21,7 +22,8 @@ mongoose.connect(dbUri)
 const Schema = mongoose.Schema;
 
 const DataSchema = new Schema({
-    nickname: String,
+    field1: String,
+    field2: String,
 });
 
 const Data = mongoose.model('Data', DataSchema);
@@ -35,20 +37,8 @@ const User = mongoose.model('User', UserSchema);
 
 // Data Routes
 app.post('/api/data', async (req, res) => {
-    const { nickname } = req.body;
-    
-    if (!nickname) {
-        return res.status(400).send({ message: 'Nickname is required' });
-    }
-
+    const newData = new Data(req.body);
     try {
-        // Check if nickname already exists
-        const existingData = await Data.findOne({ nickname });
-        if (existingData) {
-            return res.status(400).send({ message: 'Nickname already exists' });
-        }
-
-        const newData = new Data({ nickname });
         await newData.save();
         res.status(201).send(newData);
     } catch (error) {
@@ -61,8 +51,8 @@ app.get('/api/data', async (req, res) => {
         const data = await Data.find();
         if (data.length === 0) {
             const defaultData = [
-                { nickname: 'Default Nickname 1' },
-                { nickname: 'Default Nickname 2' },
+                { field1: 'Default Field 1 - 1', field2: 'Default Field 2 - 1' },
+                { field1: 'Default Field 1 - 2', field2: 'Default Field 2 - 2' },
             ];
             return res.status(200).send(defaultData);
         }
@@ -72,13 +62,17 @@ app.get('/api/data', async (req, res) => {
     }
 });
 
-app.delete('/api/data/:nickname', async (req, res) => {
-    const { nickname } = req.params;
+app.delete('/api/data/:id', async (req, res) => {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).send({ message: 'Invalid ID format' });
+    }
 
     try {
-        const deletedData = await Data.findOneAndDelete({ nickname });
+        const deletedData = await Data.findByIdAndDelete(id);
         if (!deletedData) {
-            return res.status(404).send({ message: 'Nickname not found' });
+            return res.status(404).send({ message: 'Data not found' });
         }
         res.status(200).send(deletedData);
     } catch (error) {
