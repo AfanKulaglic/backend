@@ -26,7 +26,7 @@ const Schema = mongoose.Schema;
 
 const DataSchema = new Schema({
     nickname: String,
-    image: String, // Path to the stored image file
+    image: String, // URL to the stored image file
 });
 
 const Data = mongoose.model('Data', DataSchema);
@@ -66,17 +66,16 @@ app.post('/api/data', async (req, res) => {
 
         fs.writeFileSync(imagePath, imageBuffer);
 
-        const newData = new Data({ nickname, image: imagePath });
+        const imageUrl = `/uploads/${path.basename(imagePath)}`; // URL to access the image
+
+        const newData = new Data({ nickname, image: imageUrl });
         await newData.save();
         res.status(201).send(newData);
     } catch (error) {
-        console.error('Error saving nickname or image:', error.response ? error.response.data : error.message);
-        setError('An error occurred while saving the nickname or image.');
-      }
-      
+        console.error('Error saving nickname or image:', error.message);
+        res.status(500).send({ message: 'An error occurred while saving the nickname or image.' });
+    }
 });
-
-
 
 app.get('/api/data', async (req, res) => {
     try {
@@ -108,7 +107,7 @@ app.delete('/api/data/:id', async (req, res) => {
 
         // Delete the associated image file if it exists
         if (deletedData.image) {
-            fs.unlink(path.join(__dirname, 'uploads', deletedData.image), (err) => {
+            fs.unlink(path.join(__dirname, 'uploads', path.basename(deletedData.image)), (err) => {
                 if (err) console.error('Error deleting image file:', err);
             });
         }
