@@ -22,8 +22,7 @@ mongoose.connect(dbUri)
 const Schema = mongoose.Schema;
 
 const DataSchema = new Schema({
-    field1: String,
-    field2: String,
+    nickname: String,
 });
 
 const Data = mongoose.model('Data', DataSchema);
@@ -51,7 +50,7 @@ app.get('/api/data', async (req, res) => {
         const data = await Data.find();
         if (data.length === 0) {
             const defaultData = [
-                { nickname: 'Default Field 1 - 1', f },
+                { nickname: 'Default Field 1 - 1' },
             ];
             return res.status(200).send(defaultData);
         }
