@@ -37,7 +37,7 @@ const User = mongoose.model('User', UserSchema);
 
 // Data Routes
 app.post('/api/data', async (req, res) => {
-    const newData = new Data(req.body);
+    const newData = new Data({ nickname: req.body.nickname });
     try {
         await newData.save();
         res.status(201).send(newData);
@@ -51,8 +51,8 @@ app.get('/api/data', async (req, res) => {
         const data = await Data.find();
         if (data.length === 0) {
             const defaultData = [
-                { field1: 'Default Field 1 - 1', field2: 'Default Field 2 - 1' },
-                { field1: 'Default Field 1 - 2', field2: 'Default Field 2 - 2' },
+                { nickname: 'Default Nickname 1' },
+                { nickname: 'Default Nickname 2' },
             ];
             return res.status(200).send(defaultData);
         }
@@ -108,43 +108,6 @@ app.post('/api/login', async (req, res) => {
         res.status(500).send({ message: 'Error logging in', error });
     }
 });
-
-app.get('/api/register', async (req, res) => {
-    const { username, password } = req.query;
-    if (!username || !password) {
-        return res.status(400).send({ message: 'Username and password are required' });
-    }
-
-    try {
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = new User({ username, password: hashedPassword });
-        await newUser.save();
-        res.status(201).send({ message: 'User registered' });
-    } catch (error) {
-        res.status(400).send({ message: 'Error registering user', error });
-    }
-});
-
-app.get('/api/login', async (req, res) => {
-    const { username, password } = req.query;
-    if (!username || !password) {
-        return res.status(400).send({ message: 'Username and password are required' });
-    }
-
-    try {
-        const user = await User.findOne({ username });
-        if (!user) return res.status(400).send({ message: 'User not found' });
-
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(400).send({ message: 'Invalid credentials' });
-
-        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-        res.send({ token });
-    } catch (error) {
-        res.status(500).send({ message: 'Error logging in', error });
-    }
-});
-
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
