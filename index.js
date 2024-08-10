@@ -38,16 +38,27 @@ const UserSchema = new Schema({
 
 const User = mongoose.model('User', UserSchema);
 
-// Data Routes
-app.post('/api/data', async (req, res) => {
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/');
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({ storage });
+
+// Route for uploading image
+app.post('/api/data', upload.single('image'), async (req, res) => {
     try {
-        const { nickname, image } = req.body;
+        const { nickname } = req.body;
+        const image = req.file ? `/uploads/${req.file.filename}` : null;
 
         if (!nickname || !image) {
             return res.status(400).send({ message: 'Nickname or image URL is missing' });
         }
 
-        // `image` is the URL in this case
         const newData = new Data({ nickname, image });
         await newData.save();
         res.status(201).send(newData);
@@ -62,7 +73,7 @@ app.get('/api/data', async (req, res) => {
         const data = await Data.find();
         if (data.length === 0) {
             const defaultData = [
-                { nickname: 'Default Field 1 - 1' },
+                { nickname: 'guest1123' },
             ];
             return res.status(200).send(defaultData);
         }
@@ -109,6 +120,36 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
+app.post('/api/login', async (req, res) => {
+    const { username, password } = req.body;
+    try {
+        const user = await User.findOne({ username });
+        if (!user) return res.status(400).send({ message: 'User not found' });
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) return res.status(400).send({ message: 'Invalid credentials' });
+
+        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        res.send({ token });
+    } catch (error) {
+        res.status(500).send({ message: 'Error logging in', error });
+    }
+});
+
+// Registration Route
+app.post('/api/register', async (req, res) => {
+    const { username, password } = req.body;
+    try {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newUser = new User({ username, password: hashedPassword });
+        await newUser.save();
+        res.status(201).send({ message: 'User registered' });
+    } catch (error) {
+        res.status(400).send({ message: 'Error registering user', error });
+    }
+});
+
+// Login Route
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
     try {
