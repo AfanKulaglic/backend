@@ -51,16 +51,22 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // Data Routes
-app.post('/api/data', upload.single('image'), async (req, res) => {
+app.post('/api/data', async (req, res) => {
     try {
-        if (!req.file || !req.body.nickname) {
-            return res.status(400).send({ message: 'Nickname or image file is missing' });
+        const { nickname, image } = req.body;
+
+        if (!nickname || !image) {
+            return res.status(400).send({ message: 'Nickname or image is missing' });
         }
 
-        const { nickname } = req.body;
-        const image = req.file.filename;
+        // Decode Base64 image string and save the file
+        const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
+        const imageBuffer = Buffer.from(base64Data, 'base64');
+        const imagePath = path.join(__dirname, 'uploads', `${Date.now()}.png`);
 
-        const newData = new Data({ nickname, image });
+        fs.writeFileSync(imagePath, imageBuffer);
+
+        const newData = new Data({ nickname, image: imagePath });
         await newData.save();
         res.status(201).send(newData);
     } catch (error) {
@@ -68,6 +74,7 @@ app.post('/api/data', upload.single('image'), async (req, res) => {
         res.status(500).send({ message: 'Error saving data', error: error.message });
     }
 });
+
 
 
 app.get('/api/data', async (req, res) => {
