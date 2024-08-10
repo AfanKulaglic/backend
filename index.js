@@ -70,9 +70,10 @@ app.post('/api/data', async (req, res) => {
         await newData.save();
         res.status(201).send(newData);
     } catch (error) {
-        console.error('Error saving data:', error);
-        res.status(500).send({ message: 'Error saving data', error: error.message });
-    }
+        console.error('Error saving nickname or image:', error.response ? error.response.data : error.message);
+        setError('An error occurred while saving the nickname or image.');
+      }
+      
 });
 
 
