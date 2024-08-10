@@ -52,17 +52,23 @@ const upload = multer({ storage: storage });
 
 // Data Routes
 app.post('/api/data', upload.single('image'), async (req, res) => {
-    const { nickname } = req.body;
-    const image = req.file ? req.file.filename : null;
-
-    const newData = new Data({ nickname, image });
     try {
+        if (!req.file || !req.body.nickname) {
+            return res.status(400).send({ message: 'Nickname or image file is missing' });
+        }
+
+        const { nickname } = req.body;
+        const image = req.file.filename;
+
+        const newData = new Data({ nickname, image });
         await newData.save();
         res.status(201).send(newData);
     } catch (error) {
-        res.status(400).send({ message: 'Error saving data', error });
+        console.error('Error saving data:', error);
+        res.status(500).send({ message: 'Error saving data', error: error.message });
     }
 });
+
 
 app.get('/api/data', async (req, res) => {
     try {
