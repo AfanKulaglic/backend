@@ -26,7 +26,7 @@ const Schema = mongoose.Schema;
 
 const DataSchema = new Schema({
     nickname: String,
-    image: String, // URL of the image
+    image: String, // URL to the stored image file
 });
 
 const Data = mongoose.model('Data', DataSchema);
@@ -38,17 +38,31 @@ const UserSchema = new Schema({
 
 const User = mongoose.model('User', UserSchema);
 
+// Set up Multer for file uploads
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, 'uploads/'); // Store uploads in the 'uploads' directory
+    },
+    filename: function (req, file, cb) {
+        cb(null, Date.now() + path.extname(file.originalname)); // Name the file with a timestamp
+    }
+});
+
+const upload = multer({ storage: storage });
+
 // Data Routes
-app.post('/api/data', async (req, res) => {
+app.post('/api/data', upload.single('image'), async (req, res) => {
     try {
-        const { nickname, image } = req.body;
+        const { nickname } = req.body;
+        const image = req.file;
 
         if (!nickname || !image) {
-            return res.status(400).send({ message: 'Nickname or image URL is missing' });
+            return res.status(400).send({ message: 'Nickname or image is missing' });
         }
 
-        // `image` is the URL in this case
-        const newData = new Data({ nickname, image });
+        const imageUrl = `/uploads/${image.filename}`; // URL for accessing the image
+
+        const newData = new Data({ nickname, image: imageUrl });
         await newData.save();
         res.status(201).send(newData);
     } catch (error) {
@@ -85,9 +99,11 @@ app.delete('/api/data/:id', async (req, res) => {
             return res.status(404).send({ message: 'Data not found' });
         }
 
-        // Optionally delete the associated image file if stored locally
-        if (deletedData.image && fs.existsSync(path.join(__dirname, 'uploads', deletedData.image.split('/').pop()))) {
-            fs.unlinkSync(path.join(__dirname, 'uploads', deletedData.image.split('/').pop()));
+        // Delete the associated image file if it exists
+        if (deletedData.image) {
+            fs.unlink(path.join(__dirname, 'uploads', deletedData.image.split('/').pop()), (err) => {
+                if (err) console.error('Error deleting image file:', err);
+            });
         }
 
         res.status(200).send(deletedData);
