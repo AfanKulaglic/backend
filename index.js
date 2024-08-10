@@ -107,34 +107,7 @@ app.delete('/api/data/:id', async (req, res) => {
     }
 });
 
-// Authentication Routes
-app.post('/api/register', async (req, res) => {
-    const { username, password } = req.body;
-    try {
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = new User({ username, password: hashedPassword });
-        await newUser.save();
-        res.status(201).send({ message: 'User registered' });
-    } catch (error) {
-        res.status(400).send({ message: 'Error registering user', error });
-    }
-});
-
-app.post('/api/login', async (req, res) => {
-    const { username, password } = req.body;
-    try {
-        const user = await User.findOne({ username });
-        if (!user) return res.status(400).send({ message: 'User not found' });
-
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(400).send({ message: 'Invalid credentials' });
-
-        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-        res.send({ token });
-    } catch (error) {
-        res.status(500).send({ message: 'Error logging in', error });
-    }
-});
+// Authentication Rou
 
 // Registration Route
 app.post('/api/register', async (req, res) => {
