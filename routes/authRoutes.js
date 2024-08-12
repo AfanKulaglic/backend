@@ -7,7 +7,7 @@ const router = express.Router();
 
 // Define User Schema and Model
 const UserSchema = new mongoose.Schema({
-    username: { type: String, required: true, unique: true },
+    email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
 });
 
@@ -15,10 +15,10 @@ const User = mongoose.model('User', UserSchema);
 
 // POST register user
 router.post('/register', async (req, res) => {
-    const { username, password } = req.body;
+    const { email, password } = req.body;
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = new User({ username, password: hashedPassword });
+        const newUser = new User({ email, password: hashedPassword });
         await newUser.save();
         res.status(201).send({ message: 'User registered' });
     } catch (error) {
@@ -28,9 +28,9 @@ router.post('/register', async (req, res) => {
 
 // POST login user
 router.post('/login', async (req, res) => {
-    const { username, password } = req.body;
+    const { email, password } = req.body;
     try {
-        const user = await User.findOne({ username });
+        const user = await User.findOne({ email });
         if (!user) return res.status(400).send({ message: 'User not found' });
 
         const isMatch = await bcrypt.compare(password, user.password);
