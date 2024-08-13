@@ -1,3 +1,5 @@
+// dataRoutes.js
+
 const express = require('express');
 const mongoose = require('mongoose');
 const fs = require('fs');
@@ -7,8 +9,18 @@ const router = express.Router();
 
 // Define Data Schema and Model
 const DataSchema = new mongoose.Schema({
-    nickname: String,
-    image: String, // URL of the image
+    nickname: {
+        type: String,
+        required: true,
+    },
+    image: {
+        type: String,
+        required: true,
+    },
+    email: {
+        type: String,
+        required: true,
+    }
 });
 
 const Data = mongoose.model('Data', DataSchema);
@@ -16,18 +28,18 @@ const Data = mongoose.model('Data', DataSchema);
 // POST new data
 router.post('/data', async (req, res) => {
     try {
-        const { nickname, image } = req.body;
+        const { nickname, image, email } = req.body;
 
-        if (!nickname || !image) {
-            return res.status(400).send({ message: 'Nickname or image URL is missing' });
+        if (!nickname || !image || !email) {
+            return res.status(400).send({ message: 'Nickname, image URL, or email is missing' });
         }
 
-        const newData = new Data({ nickname, image });
+        const newData = new Data({ nickname, image, email });
         await newData.save();
         res.status(201).send(newData);
     } catch (error) {
-        console.error('Error saving nickname or image:', error.message);
-        res.status(500).send({ message: 'An error occurred while saving the nickname or image.' });
+        console.error('Error saving nickname, image, or email:', error.message);
+        res.status(500).send({ message: 'An error occurred while saving the data.' });
     }
 });
 
@@ -35,12 +47,6 @@ router.post('/data', async (req, res) => {
 router.get('/data', async (req, res) => {
     try {
         const data = await Data.find();
-        if (data.length === 0) {
-            const defaultData = [
-                { nickname: 'guest1123' },
-            ];
-            return res.status(200).send(defaultData);
-        }
         res.status(200).send(data);
     } catch (error) {
         res.status(500).send({ message: 'Error retrieving data', error });
@@ -61,8 +67,10 @@ router.delete('/data/:id', async (req, res) => {
             return res.status(404).send({ message: 'Data not found' });
         }
 
-        if (deletedData.image && fs.existsSync(path.join(__dirname, '../uploads', deletedData.image.split('/').pop()))) {
-            fs.unlinkSync(path.join(__dirname, '../uploads', deletedData.image.split('/').pop()));
+        // Remove the image file if it exists
+        const imagePath = path.join(__dirname, '../uploads', path.basename(deletedData.image));
+        if (deletedData.image && fs.existsSync(imagePath)) {
+            fs.unlinkSync(imagePath);
         }
 
         res.status(200).send(deletedData);
