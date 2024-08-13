@@ -46,19 +46,8 @@ router.post('/data', async (req, res) => {
 // GET all data
 router.get('/data', async (req, res) => {
     try {
-        const { email } = req.query;
-
-        if (!email) {
-            return res.status(400).send({ message: 'Email query parameter is required' });
-        }
-
-        const userData = await Data.findOne({ email });
-        
-        if (!userData) {
-            return res.status(404).send({ message: 'User not found' });
-        }
-
-        res.status(200).send(userData);
+        const data = await Data.find();
+        res.status(200).send(data);
     } catch (error) {
         res.status(500).send({ message: 'Error retrieving data', error });
     }
