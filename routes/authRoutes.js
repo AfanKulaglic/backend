@@ -7,7 +7,7 @@ const router = express.Router();
 
 // Define User Schema and Model
 const UserSchema = new mongoose.Schema({
-    email: { type: String, required: true, unique: true },
+    email: { type: String, required: true, unique: true, trim: true, lowercase: true },
     password: { type: String, required: true },
 });
 
@@ -22,7 +22,8 @@ router.post('/register', async (req, res) => {
         await newUser.save();
         res.status(201).send({ message: 'User registered' });
     } catch (error) {
-        res.status(400).send({ message: 'Error registering user', error });
+        console.error('Registration error:', error);
+        res.status(400).send({ message: 'Error registering user', error: error.message });
     }
 });
 
