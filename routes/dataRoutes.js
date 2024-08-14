@@ -2,8 +2,13 @@ const express = require('express');
 const mongoose = require('mongoose');
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
+const WebSocket = require('ws');
 
 const router = express.Router();
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
 
 // Define Data Schema and Model
 const DataSchema = new mongoose.Schema({
@@ -61,39 +66,35 @@ router.get('/data', async (req, res) => {
 // PATCH data by ID to add a message
 router.patch('/data/:id/messages', async (req, res) => {
     const { id } = req.params;
-    const { user, content, toUser } = req.body;
+    const { user, content } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).send({ message: 'Invalid ID format' });
     }
 
-    if (!user || !content || !toUser) {
-        return res.status(400).send({ message: 'User, content, or recipient user is missing' });
+    if (!user || !content) {
+        return res.status(400).send({ message: 'User or content is missing' });
     }
 
     try {
-        // Add message to friend
-        const updatedFriendData = await Data.findByIdAndUpdate(
+        const updatedData = await Data.findByIdAndUpdate(
             id,
             { $push: { messages: { user, content } } },
             { new: true }
         );
 
-        if (!updatedFriendData) {
-            return res.status(404).send({ message: 'Friend data not found' });
+        if (!updatedData) {
+            return res.status(404).send({ message: 'Data not found' });
         }
 
-        // Find and update user's own data
-        const userData = await Data.findOne({ nickname: toUser });
-        if (userData) {
-            await Data.findByIdAndUpdate(
-                userData._id,
-                { $push: { messages: { user, content } } },
-                { new: true }
-            );
-        }
+        // Broadcast the update to all connected WebSocket clients
+        wss.clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify(updatedData));
+            }
+        });
 
-        res.status(200).send({ friendData: updatedFriendData, userData });
+        res.status(200).send(updatedData);
     } catch (error) {
         res.status(500).send({ message: 'Error updating data with message', error });
     }
@@ -123,6 +124,11 @@ router.delete('/data/:id', async (req, res) => {
     } catch (error) {
         res.status(500).send({ message: 'Error deleting data', error });
     }
+});
+
+// Start the WebSocket server
+server.listen(3000, () => {
+    console.log('Server is running on port 3000');
 });
 
 module.exports = router;
