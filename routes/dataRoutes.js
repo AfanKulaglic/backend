@@ -1,49 +1,24 @@
 const express = require('express');
-const http = require('http');
+const router = express.Router();
 const mongoose = require('mongoose');
-const socketIo = require('socket.io');
 const path = require('path');
 const fs = require('fs');
 
-// Express app and server setup
-const app = express();
-const server = http.createServer(app);
-const io = socketIo(server);
-
-// Mongoose setup
-mongoose.connect('mongodb+srv://user1:user1@cluster0.gethqff.mongodb.net/', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-});
-
+// Data Schema
 const DataSchema = new mongoose.Schema({
-    nickname: {
-        type: String,
-        required: true,
-    },
-    image: {
-        type: String,
-        required: true,
-    },
-    email: {
-        type: String,
-        required: true,
-    },
-    messages: [
-        {
-            user: String,
-            content: String,
-            timestamp: { type: Date, default: Date.now }
-        }
-    ]
+    nickname: { type: String, required: true },
+    image: { type: String, required: true },
+    email: { type: String, required: true },
+    messages: [{
+        user: String,
+        content: String,
+        timestamp: { type: Date, default: Date.now }
+    }]
 });
 
 const Data = mongoose.model('Data', DataSchema);
 
-app.use(express.json());
-
-// Define routes
-app.post('/api/data', async (req, res) => {
+router.post('/', async (req, res) => {
     try {
         const { nickname, image, email } = req.body;
         if (!nickname || !image || !email) {
@@ -58,7 +33,7 @@ app.post('/api/data', async (req, res) => {
     }
 });
 
-app.get('/api/data', async (req, res) => {
+router.get('/', async (req, res) => {
     try {
         const data = await Data.find();
         res.status(200).send(data);
@@ -67,7 +42,7 @@ app.get('/api/data', async (req, res) => {
     }
 });
 
-app.patch('/api/data/:id/messages', async (req, res) => {
+router.patch('/:id/messages', async (req, res) => {
     const { id } = req.params;
     const { user, content, toUser } = req.body;
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -100,7 +75,7 @@ app.patch('/api/data/:id/messages', async (req, res) => {
     }
 });
 
-app.delete('/api/data/:id', async (req, res) => {
+router.delete('/:id', async (req, res) => {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).send({ message: 'Invalid ID format' });
@@ -120,15 +95,4 @@ app.delete('/api/data/:id', async (req, res) => {
     }
 });
 
-// Socket.IO setup
-io.on('connection', (socket) => {
-    console.log('New client connected');
-
-    socket.on('disconnect', () => {
-        console.log('Client disconnected');
-    });
-});
-
-server.listen(3000, () => {
-    console.log('Server running on port 3000');
-});
+module.exports = router;
