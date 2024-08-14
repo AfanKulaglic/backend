@@ -1,4 +1,3 @@
-// Import necessary packages
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -6,27 +5,28 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 require('dotenv').config();
 
-// Express app and server setup
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
     cors: {
-        origin: 'http://localhost:5173', // Your frontend origin
+        origin: 'http://localhost:5173', // Frontend URL
         methods: ['GET', 'POST']
     }
 });
 
-// Mongoose setup
+// CORS middleware
+app.use(cors({
+    origin: 'http://localhost:5173', // Frontend URL
+    methods: ['GET', 'POST', 'PATCH'],
+    credentials: true
+}));
+
+// Mongoose connection
 mongoose.connect(process.env.MONGODB_URI)
     .then(() => console.log('MongoDB connected'))
     .catch(err => console.error('MongoDB connection error:', err));
 
-// Middleware setup
-app.use(cors({
-    origin: 'http://localhost:5173', // Your frontend origin
-    methods: ['GET', 'POST'],
-    credentials: true
-}));
+// Middleware
 app.use(express.json());
 
 // Import routes
@@ -36,7 +36,7 @@ const authRoutes = require('./routes/authRoutes');
 app.use('/api', dataRoutes);
 app.use('/api', authRoutes);
 
-// Socket.IO setup
+// Socket.IO
 io.on('connection', (socket) => {
     console.log('New client connected');
     socket.on('disconnect', () => {
