@@ -1,29 +1,33 @@
-require('dotenv').config();
+// Import necessary packages
 const express = require('express');
-const mongoose = require('mongoose');
-const bodyParser = require('body-parser');
-const cors = require('cors');
 const http = require('http');
 const socketIo = require('socket.io');
+const cors = require('cors');
+const mongoose = require('mongoose');
+require('dotenv').config();
 
 // Express app and server setup
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
+const io = socketIo(server, {
+    cors: {
+        origin: 'http://localhost:5173', // Your frontend origin
+        methods: ['GET', 'POST']
+    }
+});
 
 // Mongoose setup
-const dbUri = process.env.MONGODB_URI;
-
-mongoose.connect(dbUri)
+mongoose.connect(process.env.MONGODB_URI)
     .then(() => console.log('MongoDB connected'))
-    .catch((err) => console.error('MongoDB connection error:', err));
+    .catch(err => console.error('MongoDB connection error:', err));
 
 // Middleware setup
-app.use(bodyParser.json());
 app.use(cors({
-    origin: 'http://localhost:5173', // Dozvoljava samo ovu domenu
-    methods: ['GET', 'POST', 'PATCH', 'DELETE'] // Dozvoljava ove HTTP metode
+    origin: 'http://localhost:5173', // Your frontend origin
+    methods: ['GET', 'POST'],
+    credentials: true
 }));
+app.use(express.json());
 
 // Import routes
 const dataRoutes = require('./routes/dataRoutes');
@@ -35,12 +39,6 @@ app.use('/api', authRoutes);
 // Socket.IO setup
 io.on('connection', (socket) => {
     console.log('New client connected');
-
-    socket.on('sendMessage', (message) => {
-        // Emit the message to other clients
-        io.emit('newMessage', message);
-    });
-
     socket.on('disconnect', () => {
         console.log('Client disconnected');
     });
