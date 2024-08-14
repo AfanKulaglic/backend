@@ -1,5 +1,3 @@
-// dataRoutes.js
-
 const express = require('express');
 const mongoose = require('mongoose');
 const fs = require('fs');
@@ -20,7 +18,14 @@ const DataSchema = new mongoose.Schema({
     email: {
         type: String,
         required: true,
-    }
+    },
+    messages: [
+        {
+            user: String,
+            content: String,
+            timestamp: { type: Date, default: Date.now }
+        }
+    ]
 });
 
 const Data = mongoose.model('Data', DataSchema);
@@ -50,6 +55,36 @@ router.get('/data', async (req, res) => {
         res.status(200).send(data);
     } catch (error) {
         res.status(500).send({ message: 'Error retrieving data', error });
+    }
+});
+
+// PATCH data by ID to add a message
+router.patch('/data/:id/messages', async (req, res) => {
+    const { id } = req.params;
+    const { user, content } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).send({ message: 'Invalid ID format' });
+    }
+
+    if (!user || !content) {
+        return res.status(400).send({ message: 'User or content is missing' });
+    }
+
+    try {
+        const updatedData = await Data.findByIdAndUpdate(
+            id,
+            { $push: { messages: { user, content } } },
+            { new: true }
+        );
+
+        if (!updatedData) {
+            return res.status(404).send({ message: 'Data not found' });
+        }
+
+        res.status(200).send(updatedData);
+    } catch (error) {
+        res.status(500).send({ message: 'Error updating data with message', error });
     }
 });
 
