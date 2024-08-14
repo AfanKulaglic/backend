@@ -5,8 +5,6 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const http = require('http');
 const socketIo = require('socket.io');
-const path = require('path');
-const fs = require('fs');
 
 // Express app and server setup
 const app = express();
@@ -22,7 +20,10 @@ mongoose.connect(dbUri)
 
 // Middleware setup
 app.use(bodyParser.json());
-app.use(cors());
+app.use(cors({
+    origin: 'http://localhost:5173', // Dozvoljava samo ovu domenu
+    methods: ['GET', 'POST', 'PATCH', 'DELETE'] // Dozvoljava ove HTTP metode
+}));
 
 // Import routes
 const dataRoutes = require('./routes/dataRoutes');
@@ -34,6 +35,11 @@ app.use('/api', authRoutes);
 // Socket.IO setup
 io.on('connection', (socket) => {
     console.log('New client connected');
+
+    socket.on('sendMessage', (message) => {
+        // Emit the message to other clients
+        io.emit('newMessage', message);
+    });
 
     socket.on('disconnect', () => {
         console.log('Client disconnected');
