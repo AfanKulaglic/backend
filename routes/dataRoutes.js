@@ -1,14 +1,40 @@
 const express = require('express');
-const mongoose = require('mongoose');
-const fs = require('fs');
-const path = require('path');
 const http = require('http');
 const WebSocket = require('ws');
+const mongoose = require('mongoose');
+const path = require('path');
+const fs = require('fs');
+const cors = require('cors');
 
-const router = express.Router();
+// Initialize Express app
 const app = express();
+app.use(express.json());
+app.use(cors()); // Enable CORS for WebSocket and HTTP requests
+
+// Create HTTP server
 const server = http.createServer(app);
+
+// Create WebSocket server
 const wss = new WebSocket.Server({ server });
+
+// WebSocket connection handling
+wss.on('connection', (ws) => {
+    console.log('New WebSocket connection');
+
+    ws.on('message', (message) => {
+        console.log(`Received message => ${message}`);
+        // Broadcast the message to all connected clients
+        wss.clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(message);
+            }
+        });
+    });
+
+    ws.on('close', () => {
+        console.log('WebSocket connection closed');
+    });
+});
 
 // Define Data Schema and Model
 const DataSchema = new mongoose.Schema({
@@ -35,8 +61,14 @@ const DataSchema = new mongoose.Schema({
 
 const Data = mongoose.model('Data', DataSchema);
 
+// Connect to MongoDB
+const mongoURI = 'your-mongodb-connection-string';
+mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
+    .then(() => console.log('MongoDB connected'))
+    .catch(err => console.error('MongoDB connection error:', err));
+
 // POST new data
-router.post('/data', async (req, res) => {
+app.post('/api/data', async (req, res) => {
     try {
         const { nickname, image, email } = req.body;
 
@@ -54,7 +86,7 @@ router.post('/data', async (req, res) => {
 });
 
 // GET all data
-router.get('/data', async (req, res) => {
+app.get('/api/data', async (req, res) => {
     try {
         const data = await Data.find();
         res.status(200).send(data);
@@ -64,7 +96,7 @@ router.get('/data', async (req, res) => {
 });
 
 // PATCH data by ID to add a message
-router.patch('/data/:id/messages', async (req, res) => {
+app.patch('/api/data/:id/messages', async (req, res) => {
     const { id } = req.params;
     const { user, content } = req.body;
 
@@ -87,7 +119,7 @@ router.patch('/data/:id/messages', async (req, res) => {
             return res.status(404).send({ message: 'Data not found' });
         }
 
-        // Broadcast the update to all connected WebSocket clients
+        // Broadcast the updated data to all connected WebSocket clients
         wss.clients.forEach(client => {
             if (client.readyState === WebSocket.OPEN) {
                 client.send(JSON.stringify(updatedData));
@@ -101,7 +133,7 @@ router.patch('/data/:id/messages', async (req, res) => {
 });
 
 // DELETE data by ID
-router.delete('/data/:id', async (req, res) => {
+app.delete('/api/data/:id', async (req, res) => {
     const { id } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -126,9 +158,8 @@ router.delete('/data/:id', async (req, res) => {
     }
 });
 
-// Start the WebSocket server
-server.listen(3000, () => {
-    console.log('Server is running on port 3000');
+// Start the HTTP server
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
 });
-
-module.exports = router;
