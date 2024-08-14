@@ -61,28 +61,39 @@ router.get('/data', async (req, res) => {
 // PATCH data by ID to add a message
 router.patch('/data/:id/messages', async (req, res) => {
     const { id } = req.params;
-    const { user, content, senderUsername } = req.body;
+    const { user, content, toUser } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).send({ message: 'Invalid ID format' });
     }
 
-    if (!user || !content || !senderUsername) {
-        return res.status(400).send({ message: 'User, content, or senderUsername is missing' });
+    if (!user || !content || !toUser) {
+        return res.status(400).send({ message: 'User, content, or recipient user is missing' });
     }
 
     try {
-        const updatedData = await Data.findByIdAndUpdate(
+        // Add message to friend
+        const updatedFriendData = await Data.findByIdAndUpdate(
             id,
-            { $push: { messages: { user, content, senderUsername } } },
+            { $push: { messages: { user, content } } },
             { new: true }
         );
 
-        if (!updatedData) {
-            return res.status(404).send({ message: 'Data not found' });
+        if (!updatedFriendData) {
+            return res.status(404).send({ message: 'Friend data not found' });
         }
 
-        res.status(200).send(updatedData);
+        // Find and update user's own data
+        const userData = await Data.findOne({ nickname: toUser });
+        if (userData) {
+            await Data.findByIdAndUpdate(
+                userData._id,
+                { $push: { messages: { user, content } } },
+                { new: true }
+            );
+        }
+
+        res.status(200).send({ friendData: updatedFriendData, userData });
     } catch (error) {
         res.status(500).send({ message: 'Error updating data with message', error });
     }
