@@ -39,12 +39,6 @@ app.use('/api', authRoutes);
 // Socket.IO
 io.on('connection', (socket) => {
     console.log('New client connected');
-
-    socket.on('sendMessage', (data) => {
-        // Emit new message to all connected clients
-        io.emit('newMessage', data);
-    });
-
     socket.on('disconnect', () => {
         console.log('Client disconnected');
     });
