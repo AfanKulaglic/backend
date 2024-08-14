@@ -61,20 +61,20 @@ router.get('/data', async (req, res) => {
 // PATCH data by ID to add a message
 router.patch('/data/:id/messages', async (req, res) => {
     const { id } = req.params;
-    const { user, content } = req.body;
+    const { user, content, senderUsername } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).send({ message: 'Invalid ID format' });
     }
 
-    if (!user || !content) {
-        return res.status(400).send({ message: 'User or content is missing' });
+    if (!user || !content || !senderUsername) {
+        return res.status(400).send({ message: 'User, content, or senderUsername is missing' });
     }
 
     try {
         const updatedData = await Data.findByIdAndUpdate(
             id,
-            { $push: { messages: { user, content } } },
+            { $push: { messages: { user, content, senderUsername } } },
             { new: true }
         );
 
