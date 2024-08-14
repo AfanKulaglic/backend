@@ -1,11 +1,21 @@
 const express = require('express');
+const http = require('http');
 const mongoose = require('mongoose');
-const fs = require('fs');
+const socketIo = require('socket.io');
 const path = require('path');
+const fs = require('fs');
 
-const router = express.Router();
+// Express app and server setup
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
 
-// Define Data Schema and Model
+// Mongoose setup
+mongoose.connect('mongodb+srv://user1:user1@cluster0.gethqff.mongodb.net/', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+});
+
 const DataSchema = new mongoose.Schema({
     nickname: {
         type: String,
@@ -30,15 +40,15 @@ const DataSchema = new mongoose.Schema({
 
 const Data = mongoose.model('Data', DataSchema);
 
-// POST new data
-router.post('/data', async (req, res) => {
+app.use(express.json());
+
+// Define routes
+app.post('/api/data', async (req, res) => {
     try {
         const { nickname, image, email } = req.body;
-
         if (!nickname || !image || !email) {
             return res.status(400).send({ message: 'Nickname, image URL, or email is missing' });
         }
-
         const newData = new Data({ nickname, image, email });
         await newData.save();
         res.status(201).send(newData);
@@ -48,8 +58,7 @@ router.post('/data', async (req, res) => {
     }
 });
 
-// GET all data
-router.get('/data', async (req, res) => {
+app.get('/api/data', async (req, res) => {
     try {
         const data = await Data.find();
         res.status(200).send(data);
@@ -58,32 +67,24 @@ router.get('/data', async (req, res) => {
     }
 });
 
-// PATCH data by ID to add a message
-router.patch('/data/:id/messages', async (req, res) => {
+app.patch('/api/data/:id/messages', async (req, res) => {
     const { id } = req.params;
     const { user, content, toUser } = req.body;
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).send({ message: 'Invalid ID format' });
     }
-
     if (!user || !content || !toUser) {
         return res.status(400).send({ message: 'User, content, or recipient user is missing' });
     }
-
     try {
-        // Add message to friend
         const updatedFriendData = await Data.findByIdAndUpdate(
             id,
             { $push: { messages: { user, content } } },
             { new: true }
         );
-
         if (!updatedFriendData) {
             return res.status(404).send({ message: 'Friend data not found' });
         }
-
-        // Find and update user's own data
         const userData = await Data.findOne({ nickname: toUser });
         if (userData) {
             await Data.findByIdAndUpdate(
@@ -92,37 +93,42 @@ router.patch('/data/:id/messages', async (req, res) => {
                 { new: true }
             );
         }
-
+        io.emit('newMessage', { friendData: updatedFriendData, userData });
         res.status(200).send({ friendData: updatedFriendData, userData });
     } catch (error) {
         res.status(500).send({ message: 'Error updating data with message', error });
     }
 });
 
-// DELETE data by ID
-router.delete('/data/:id', async (req, res) => {
+app.delete('/api/data/:id', async (req, res) => {
     const { id } = req.params;
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).send({ message: 'Invalid ID format' });
     }
-
     try {
         const deletedData = await Data.findByIdAndDelete(id);
         if (!deletedData) {
             return res.status(404).send({ message: 'Data not found' });
         }
-
-        // Remove the image file if it exists
         const imagePath = path.join(__dirname, '../uploads', path.basename(deletedData.image));
         if (deletedData.image && fs.existsSync(imagePath)) {
             fs.unlinkSync(imagePath);
         }
-
         res.status(200).send(deletedData);
     } catch (error) {
         res.status(500).send({ message: 'Error deleting data', error });
     }
 });
 
-module.exports = router;
+// Socket.IO setup
+io.on('connection', (socket) => {
+    console.log('New client connected');
+
+    socket.on('disconnect', () => {
+        console.log('Client disconnected');
+    });
+});
+
+server.listen(3000, () => {
+    console.log('Server running on port 3000');
+});
