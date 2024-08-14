@@ -23,7 +23,8 @@ const DataSchema = new mongoose.Schema({
         {
             user: String,
             content: String,
-            timestamp: { type: Date, default: Date.now }
+            timestamp: { type: Date, default: Date.now },
+            toUser: String // Added recipient username field
         }
     ]
 });
@@ -67,7 +68,7 @@ router.patch('/data/:id/messages', async (req, res) => {
     try {
         const updatedFriendData = await Data.findByIdAndUpdate(
             id,
-            { $push: { messages: { user, content } } },
+            { $push: { messages: { user, content, toUser } } },
             { new: true }
         );
         if (!updatedFriendData) {
@@ -77,7 +78,7 @@ router.patch('/data/:id/messages', async (req, res) => {
         if (userData) {
             await Data.findByIdAndUpdate(
                 userData._id,
-                { $push: { messages: { user, content } } },
+                { $push: { messages: { user, content, toUser: userData.nickname } } },
                 { new: true }
             );
         }
