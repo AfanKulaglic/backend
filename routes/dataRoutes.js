@@ -1,24 +1,37 @@
 const express = require('express');
-const router = express.Router();
 const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
 
-// Data Schema
+const router = express.Router();
+
+// Define Data Schema and Model
 const DataSchema = new mongoose.Schema({
-    nickname: { type: String, required: true },
-    image: { type: String, required: true },
-    email: { type: String, required: true },
-    messages: [{
-        user: String,
-        content: String,
-        timestamp: { type: Date, default: Date.now }
-    }]
+    nickname: {
+        type: String,
+        required: true,
+    },
+    image: {
+        type: String,
+        required: true,
+    },
+    email: {
+        type: String,
+        required: true,
+    },
+    messages: [
+        {
+            user: String,
+            content: String,
+            timestamp: { type: Date, default: Date.now }
+        }
+    ]
 });
 
 const Data = mongoose.model('Data', DataSchema);
 
-router.post('/', async (req, res) => {
+// Define routes
+router.post('/data', async (req, res) => {
     try {
         const { nickname, image, email } = req.body;
         if (!nickname || !image || !email) {
@@ -33,7 +46,7 @@ router.post('/', async (req, res) => {
     }
 });
 
-router.get('/', async (req, res) => {
+router.get('/data', async (req, res) => {
     try {
         const data = await Data.find();
         res.status(200).send(data);
@@ -42,7 +55,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-router.patch('/:id/messages', async (req, res) => {
+router.patch('/data/:id/messages', async (req, res) => {
     const { id } = req.params;
     const { user, content, toUser } = req.body;
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -75,7 +88,7 @@ router.patch('/:id/messages', async (req, res) => {
     }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/data/:id', async (req, res) => {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).send({ message: 'Invalid ID format' });

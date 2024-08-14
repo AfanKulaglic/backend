@@ -8,25 +8,28 @@ const socketIo = require('socket.io');
 const path = require('path');
 const fs = require('fs');
 
+// Express app and server setup
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// Middleware
-app.use(bodyParser.json());
-app.use(cors());
-
 // Mongoose setup
 const dbUri = process.env.MONGODB_URI;
-mongoose.connect(dbUri, { useNewUrlParser: true, useUnifiedTopology: true })
+
+mongoose.connect(dbUri)
     .then(() => console.log('MongoDB connected'))
     .catch((err) => console.error('MongoDB connection error:', err));
 
-// Routes
+// Middleware setup
+app.use(bodyParser.json());
+app.use(cors());
+
+// Import routes
 const dataRoutes = require('./routes/dataRoutes');
 const authRoutes = require('./routes/authRoutes');
-app.use('/api/data', dataRoutes);
-app.use('/api/auth', authRoutes);
+
+app.use('/api', dataRoutes);
+app.use('/api', authRoutes);
 
 // Socket.IO setup
 io.on('connection', (socket) => {
@@ -37,6 +40,7 @@ io.on('connection', (socket) => {
     });
 });
 
+// Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
