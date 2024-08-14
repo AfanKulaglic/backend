@@ -1,51 +1,49 @@
-const express = require('express');
-const http = require('http');
-const socketIo = require('socket.io');
-const cors = require('cors');
-const mongoose = require('mongoose');
 require('dotenv').config();
+const express = require('express');
+const mongoose = require('mongoose');
+const bodyParser = require('body-parser');
+const cors = require('cors');
+const http = require('http'); // Uvoz http modula
+const { Server } = require('socket.io'); // Uvoz Server iz socket.io
 
 const app = express();
-const server = http.createServer(app);
-const io = socketIo(server, {
-    cors: {
-        origin: 'http://localhost:5173', // Frontend URL
-        methods: ['GET', 'POST']
-    }
-});
+const server = http.createServer(app); // Kreiranje HTTP servera
+const io = new Server(server, { cors: { origin: "*" } }); // Kreiranje nove instance Socket.IO servera
 
-// CORS middleware
-app.use(cors({
-    origin: 'http://localhost:5173', // Frontend URL
-    methods: ['GET', 'POST', 'PATCH'],
-    credentials: true
-}));
+app.use(bodyParser.json());
+app.use(cors());
 
-// Mongoose connection
-mongoose.connect(process.env.MONGODB_URI)
-    .then(() => console.log('MongoDB connected'))
-    .catch(err => console.error('MongoDB connection error:', err));
+// Povezivanje s MongoDB-om
+const dbUri = process.env.MONGODB_URI;
 
-// Middleware
-app.use(express.json());
+mongoose.connect(dbUri)
+    .then(() => console.log('Povezan sa MongoDB-om'))
+    .catch((err) => console.error('Greška pri povezivanju s MongoDB-om:', err));
 
-// Import routes
+// Rute
 const dataRoutes = require('./routes/dataRoutes');
 const authRoutes = require('./routes/authRoutes');
 
 app.use('/api', dataRoutes);
 app.use('/api', authRoutes);
 
-// Socket.IO
+// Kada se klijent poveže
 io.on('connection', (socket) => {
-    console.log('New client connected');
+    console.log('Novi klijent je povezan');
+
+    // Primanje poruke od klijenta
+    socket.on('sendMessage', (data) => {
+        // Emitiranje poruke svim povezanim klijentima
+        io.emit('receiveMessage', data);
+    });
+
+    // Kada se klijent odvoji
     socket.on('disconnect', () => {
-        console.log('Client disconnected');
+        console.log('Klijent je odspojen');
     });
 });
 
-// Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`Server radi na portu ${PORT}`);
 });
