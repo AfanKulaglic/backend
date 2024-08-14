@@ -81,7 +81,7 @@ router.patch('/data/:id/messages', async (req, res) => {
                 { new: true }
             );
         }
-        io.emit('newMessage', { friendData: updatedFriendData, userData });
+        io.emit('newMessage', { user, content, timestamp: new Date().toISOString() });
         res.status(200).send({ friendData: updatedFriendData, userData });
     } catch (error) {
         res.status(500).send({ message: 'Error updating data with message', error });
@@ -102,7 +102,7 @@ router.delete('/data/:id', async (req, res) => {
         if (deletedData.image && fs.existsSync(imagePath)) {
             fs.unlinkSync(imagePath);
         }
-        res.status(200).send(deletedData);
+        res.status(200).send({ message: 'Data deleted successfully' });
     } catch (error) {
         res.status(500).send({ message: 'Error deleting data', error });
     }
