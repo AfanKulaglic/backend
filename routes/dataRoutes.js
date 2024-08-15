@@ -2,8 +2,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
-
 const router = express.Router();
+const io = require('socket.io')(3000); // Ensure the same socket instance is used
 
 // Define Data Schema and Model
 const DataSchema = new mongoose.Schema({
@@ -24,7 +24,8 @@ const DataSchema = new mongoose.Schema({
             user: String,
             content: String,
             timestamp: { type: Date, default: Date.now },
-            toUser: String // Added recipient username field
+            toUser: String,
+            _id: { type: String, default: () => new Date().toISOString() } // Ensure unique ID for messages
         }
     ]
 });
@@ -58,30 +59,33 @@ router.get('/data', async (req, res) => {
 
 router.patch('/data/:id/messages', async (req, res) => {
     const { id } = req.params;
-    const { user, content, toUser } = req.body;
+    const { user, content, toUser, _id } = req.body;
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).send({ message: 'Invalid ID format' });
     }
-    if (!user || !content || !toUser) {
-        return res.status(400).send({ message: 'User, content, or recipient user is missing' });
+    if (!user || !content || !toUser || !_id) {
+        return res.status(400).send({ message: 'User, content, recipient user, or ID is missing' });
     }
     try {
         const updatedFriendData = await Data.findByIdAndUpdate(
             id,
-            { $push: { messages: { user, content, toUser } } },
+            { $push: { messages: { user, content, toUser, _id } } },
             { new: true }
         );
+
         if (!updatedFriendData) {
             return res.status(404).send({ message: 'Friend data not found' });
         }
+
         const userData = await Data.findOne({ nickname: toUser });
         if (userData) {
             await Data.findByIdAndUpdate(
                 userData._id,
-                { $push: { messages: { user, content, toUser: userData.nickname } } },
+                { $push: { messages: { user, content, toUser: userData.nickname, _id } } },
                 { new: true }
             );
         }
+
         io.emit('newMessage', { friendData: updatedFriendData, userData });
         res.status(200).send({ friendData: updatedFriendData, userData });
     } catch (error) {
