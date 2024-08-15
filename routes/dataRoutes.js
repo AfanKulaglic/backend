@@ -59,35 +59,40 @@ router.get('/data', async (req, res) => {
 
 router.patch('/data/:id/messages', async (req, res) => {
     const { id } = req.params;
-    const { user, content, toUser, _id } = req.body;
+    const { user, content, toUser, _id, timestamp } = req.body;
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).send({ message: 'Invalid ID format' });
     }
-    if (!user || !content || !toUser || !_id) {
-        return res.status(400).send({ message: 'User, content, recipient user, or ID is missing' });
+    if (!user || !content || !toUser || !_id || !timestamp) {
+        return res.status(400).send({ message: 'User, content, recipient user, ID, or timestamp is missing' });
     }
     try {
-        const updatedFriendData = await Data.findByIdAndUpdate(
-            id,
-            { $push: { messages: { user, content, toUser, _id } } },
-            { new: true }
-        );
-
+        const updatedFriendData = await Data.findById(id);
         if (!updatedFriendData) {
             return res.status(404).send({ message: 'Friend data not found' });
         }
 
-        const userData = await Data.findOne({ nickname: toUser });
-        if (userData) {
-            await Data.findByIdAndUpdate(
-                userData._id,
-                { $push: { messages: { user, content, toUser: userData.nickname, _id } } },
-                { new: true }
-            );
-        }
+        // Check if the message already exists
+        const messageExists = updatedFriendData.messages.some(m => m._id === _id);
+        if (!messageExists) {
+            updatedFriendData.messages.push({ user, content, toUser, _id, timestamp });
+            await updatedFriendData.save();
 
-        io.emit('newMessage', { friendData: updatedFriendData, userData });
-        res.status(200).send({ friendData: updatedFriendData, userData });
+            const userData = await Data.findOne({ nickname: toUser });
+            if (userData) {
+                // Send the message to the recipient
+                const recipientMessageExists = userData.messages.some(m => m._id === _id);
+                if (!recipientMessageExists) {
+                    userData.messages.push({ user, content, toUser: userData.nickname, _id, timestamp });
+                    await userData.save();
+                }
+            }
+
+            io.emit('newMessage', { friendData: updatedFriendData, userData });
+            res.status(200).send({ friendData: updatedFriendData, userData });
+        } else {
+            res.status(200).send({ friendData: updatedFriendData, userData: null });
+        }
     } catch (error) {
         res.status(500).send({ message: 'Error updating data with message', error });
     }
