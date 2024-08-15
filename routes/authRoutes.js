@@ -5,15 +5,12 @@ const jwt = require('jsonwebtoken');
 
 const router = express.Router();
 
-// Define User Schema and Model
 const UserSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true, trim: true, lowercase: true },
     password: { type: String, required: true },
 });
 
 const User = mongoose.model('User', UserSchema);
-
-// POST register user
 router.post('/register', async (req, res) => {
     const { email, password } = req.body;
     try {
@@ -27,7 +24,6 @@ router.post('/register', async (req, res) => {
     }
 });
 
-// POST login user
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     try {
