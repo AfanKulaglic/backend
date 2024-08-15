@@ -2,8 +2,9 @@ const express = require('express');
 const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
+const { v4: uuidv4 } = require('uuid'); // Import UUID for unique IDs
+
 const router = express.Router();
-const io = require('socket.io')(3000); // Ensure the same socket instance is used
 
 // Define Data Schema and Model
 const DataSchema = new mongoose.Schema({
@@ -21,11 +22,11 @@ const DataSchema = new mongoose.Schema({
     },
     messages: [
         {
+            _id: { type: String, default: uuidv4 }, // Unique ID for each message
             user: String,
             content: String,
             timestamp: { type: Date, default: Date.now },
-            toUser: String,
-            _id: { type: String, default: () => new Date().toISOString() } // Ensure unique ID for messages
+            toUser: String // Added recipient username field
         }
     ]
 });
@@ -60,12 +61,14 @@ router.get('/data', async (req, res) => {
 router.patch('/data/:id/messages', async (req, res) => {
     const { id } = req.params;
     const { user, content, toUser, _id, timestamp } = req.body;
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).send({ message: 'Invalid ID format' });
     }
     if (!user || !content || !toUser || !_id || !timestamp) {
         return res.status(400).send({ message: 'User, content, recipient user, ID, or timestamp is missing' });
     }
+
     try {
         const updatedFriendData = await Data.findById(id);
         if (!updatedFriendData) {
