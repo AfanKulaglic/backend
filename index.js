@@ -29,7 +29,7 @@ io.on('connection', (socket) => {
     console.log('New client connected');
 
     socket.on('sendMessage', (data) => {
-        io.emit('newMessage', data); // Updated event name
+        io.emit('newMessage', data); // Emituje 'newMessage' događaj za sve povezane klijente
     });
 
     socket.on('disconnect', () => {
