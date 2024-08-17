@@ -2,12 +2,11 @@ const express = require('express');
 const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
-const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
+const { v4: uuidv4 } = require('uuid');
 
 const router = express.Router();
 
-// Postojeći kod za definiranje sheme i ruta...
 const DataSchema = new mongoose.Schema({
     nickname: {
         type: String,
@@ -34,6 +33,19 @@ const DataSchema = new mongoose.Schema({
 
 const Data = mongoose.model('Data', DataSchema);
 
+// Multer konfiguracija za upload slika
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/');
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({ storage: storage });
+
+// Ruta za kreiranje korisnika
 router.post('/data', async (req, res) => {
     try {
         const { nickname, image, email } = req.body;
@@ -49,6 +61,7 @@ router.post('/data', async (req, res) => {
     }
 });
 
+// Ruta za dobijanje svih korisnika
 router.get('/data', async (req, res) => {
     try {
         const data = await Data.find();
@@ -58,6 +71,7 @@ router.get('/data', async (req, res) => {
     }
 });
 
+// Ruta za ažuriranje poruka
 router.patch('/data/:id/messages', async (req, res) => {
     const { id } = req.params;
     const { user, content, toUser, _id, timestamp } = req.body;
@@ -97,6 +111,29 @@ router.patch('/data/:id/messages', async (req, res) => {
     }
 });
 
+// Ruta za ažuriranje slike korisnika prema ID-u
+router.patch('/data/:id/image', upload.single('image'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).send({ message: 'Invalid ID format' });
+        }
+
+        const data = await Data.findByIdAndUpdate(id, { image: imageUrl }, { new: true });
+
+        if (!data) {
+            return res.status(404).send({ message: 'User not found' });
+        }
+
+        res.status(200).send(data);
+    } catch (error) {
+        res.status(500).send({ message: 'Error updating image', error });
+    }
+});
+
+// Ruta za brisanje korisnika
 router.delete('/data/:id', async (req, res) => {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -114,47 +151,6 @@ router.delete('/data/:id', async (req, res) => {
         res.status(200).send(deletedData);
     } catch (error) {
         res.status(500).send({ message: 'Error deleting data', error });
-    }
-});
-
-// Novi kod za upload i ažuriranje slike
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'uploads/');
-    },
-    filename: (req, file, cb) => {
-        cb(null, `${uuidv4()}-${file.originalname}`);
-    }
-});
-
-const upload = multer({ storage });
-
-router.patch('/data/:id/image', upload.single('image'), async (req, res) => {
-    const { id } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(400).send({ message: 'Invalid ID format' });
-    }
-
-    try {
-        const userData = await Data.findById(id);
-        if (!userData) {
-            return res.status(404).send({ message: 'User not found' });
-        }
-
-        if (userData.image) {
-            const oldImagePath = path.join(__dirname, '../uploads', path.basename(userData.image));
-            if (fs.existsSync(oldImagePath)) {
-                fs.unlinkSync(oldImagePath);
-            }
-        }
-
-        userData.image = `/uploads/${req.file.filename}`;
-        await userData.save();
-
-        res.status(200).send(userData);
-    } catch (error) {
-        res.status(500).send({ message: 'Error updating image', error });
     }
 });
 
