@@ -68,12 +68,10 @@ router.patch('/data/:id/messages', async (req, res) => {
     }
 
     try {
-
         const updatedFriendData = await Data.findById(id);
         if (!updatedFriendData) {
             return res.status(404).send({ message: 'Friend data not found' });
         }
-
 
         const messageExistsForFriend = updatedFriendData.messages.some(m => m._id === _id);
         if (!messageExistsForFriend) {
@@ -81,10 +79,8 @@ router.patch('/data/:id/messages', async (req, res) => {
             await updatedFriendData.save();
         }
 
-
         const userData = await Data.findOne({ nickname: user });
         if (userData) {
-
             const messageExistsForUser = userData.messages.some(m => m._id === _id);
             if (!messageExistsForUser) {
                 userData.messages.push({ user, content, toUser: userData.nickname, _id, timestamp });
@@ -92,13 +88,13 @@ router.patch('/data/:id/messages', async (req, res) => {
             }
         }
 
-
-        io.emit('newMessage', { friendData: updatedFriendData, userData });
+        io.emit('newMessage', { friendData: updatedFriendData, userData }); // Ensure correct event name
         res.status(200).send({ friendData: updatedFriendData, userData });
     } catch (error) {
         res.status(500).send({ message: 'Error updating data with message', error });
     }
 });
+
 router.delete('/data/:id', async (req, res) => {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
