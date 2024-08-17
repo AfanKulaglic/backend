@@ -2,7 +2,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
-const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 
 const router = express.Router();
@@ -33,19 +32,6 @@ const DataSchema = new mongoose.Schema({
 
 const Data = mongoose.model('Data', DataSchema);
 
-// Multer konfiguracija za upload slika
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'uploads/');
-    },
-    filename: (req, file, cb) => {
-        cb(null, Date.now() + path.extname(file.originalname));
-    }
-});
-
-const upload = multer({ storage: storage });
-
-// Ruta za kreiranje korisnika
 router.post('/data', async (req, res) => {
     try {
         const { nickname, image, email } = req.body;
@@ -61,7 +47,6 @@ router.post('/data', async (req, res) => {
     }
 });
 
-// Ruta za dobijanje svih korisnika
 router.get('/data', async (req, res) => {
     try {
         const data = await Data.find();
@@ -71,7 +56,6 @@ router.get('/data', async (req, res) => {
     }
 });
 
-// Ruta za ažuriranje poruka
 router.patch('/data/:id/messages', async (req, res) => {
     const { id } = req.params;
     const { user, content, toUser, _id, timestamp } = req.body;
@@ -84,10 +68,12 @@ router.patch('/data/:id/messages', async (req, res) => {
     }
 
     try {
+
         const updatedFriendData = await Data.findById(id);
         if (!updatedFriendData) {
             return res.status(404).send({ message: 'Friend data not found' });
         }
+
 
         const messageExistsForFriend = updatedFriendData.messages.some(m => m._id === _id);
         if (!messageExistsForFriend) {
@@ -95,8 +81,10 @@ router.patch('/data/:id/messages', async (req, res) => {
             await updatedFriendData.save();
         }
 
+
         const userData = await Data.findOne({ nickname: user });
         if (userData) {
+
             const messageExistsForUser = userData.messages.some(m => m._id === _id);
             if (!messageExistsForUser) {
                 userData.messages.push({ user, content, toUser: userData.nickname, _id, timestamp });
@@ -104,36 +92,13 @@ router.patch('/data/:id/messages', async (req, res) => {
             }
         }
 
+
         io.emit('newMessage', { friendData: updatedFriendData, userData });
         res.status(200).send({ friendData: updatedFriendData, userData });
     } catch (error) {
         res.status(500).send({ message: 'Error updating data with message', error });
     }
 });
-
-// Ruta za ažuriranje slike korisnika prema ID-u
-router.patch('/data/:id/image', upload.single('image'), async (req, res) => {
-    try {
-        const { id } = req.params;
-        const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
-
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).send({ message: 'Invalid ID format' });
-        }
-
-        const data = await Data.findByIdAndUpdate(id, { image: imageUrl }, { new: true });
-
-        if (!data) {
-            return res.status(404).send({ message: 'User not found' });
-        }
-
-        res.status(200).send(data);
-    } catch (error) {
-        res.status(500).send({ message: 'Error updating image', error });
-    }
-});
-
-// Ruta za brisanje korisnika
 router.delete('/data/:id', async (req, res) => {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
