@@ -32,7 +32,6 @@ const DataSchema = new mongoose.Schema({
 
 const Data = mongoose.model('Data', DataSchema);
 
-// Create new data
 router.post('/data', async (req, res) => {
     try {
         const { nickname, image, email } = req.body;
@@ -48,7 +47,6 @@ router.post('/data', async (req, res) => {
     }
 });
 
-// Get all data
 router.get('/data', async (req, res) => {
     try {
         const data = await Data.find();
@@ -58,7 +56,6 @@ router.get('/data', async (req, res) => {
     }
 });
 
-// Update messages
 router.patch('/data/:id/messages', async (req, res) => {
     const { id } = req.params;
     const { user, content, toUser, _id, timestamp } = req.body;
@@ -91,14 +88,13 @@ router.patch('/data/:id/messages', async (req, res) => {
             }
         }
 
-        io.emit('newMessage', { friendData: updatedFriendData, userData });
+        io.emit('newMessage', { friendData: updatedFriendData, userData }); // Ensure correct event name
         res.status(200).send({ friendData: updatedFriendData, userData });
     } catch (error) {
         res.status(500).send({ message: 'Error updating data with message', error });
     }
 });
 
-// Delete data
 router.delete('/data/:id', async (req, res) => {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
