@@ -83,18 +83,17 @@ router.patch('/data/:id/messages', async (req, res) => {
         if (userData) {
             const messageExistsForUser = userData.messages.some(m => m._id === _id);
             if (!messageExistsForUser) {
-                userData.messages.push({ user, content, toUser: friendUsername, _id, timestamp });
+                userData.messages.push({ user, content, toUser: userData.nickname, _id, timestamp });
                 await userData.save();
             }
         }
 
-        io.emit('receiveMessage', { friendData: updatedFriendData, userData });
+        io.emit('newMessage', { friendData: updatedFriendData, userData }); // Ensure correct event name
         res.status(200).send({ friendData: updatedFriendData, userData });
     } catch (error) {
         res.status(500).send({ message: 'Error updating data with message', error });
     }
 });
-
 
 router.delete('/data/:id', async (req, res) => {
     const { id } = req.params;
