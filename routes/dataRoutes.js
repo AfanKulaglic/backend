@@ -88,7 +88,7 @@ router.patch('/data/:id/messages', async (req, res) => {
             }
         }
 
-        io.emit('newMessage', { friendData: updatedFriendData, userData }); // Ensure correct event name
+        io.emit('receiveMessage', { friendData: updatedFriendData, userData }); // Proverite da li je naziv događaja usklađen sa klijentom
         res.status(200).send({ friendData: updatedFriendData, userData });
     } catch (error) {
         res.status(500).send({ message: 'Error updating data with message', error });

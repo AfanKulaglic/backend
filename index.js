@@ -13,6 +13,7 @@ const io = new Server(server, { cors: { origin: "*" } });
 app.use(bodyParser.json());
 app.use(cors());
 
+// Proverite da li je URI za MongoDB ispravan
 const dbUri = process.env.MONGODB_URI;
 
 mongoose.connect(dbUri)
@@ -29,7 +30,8 @@ io.on('connection', (socket) => {
     console.log('New client connected');
 
     socket.on('sendMessage', (data) => {
-        io.emit('newMessage', data); // Updated event name
+        console.log('Received message data:', data);
+        io.emit('receiveMessage', data); // Proverite da li je naziv događaja usklađen sa klijentom
     });
 
     socket.on('disconnect', () => {
