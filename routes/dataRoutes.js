@@ -125,10 +125,10 @@ router.patch('/data/:id/markAsSeen', async (req, res) => {
         await chatData.save();
         res.status(200).send(chatData);
     } catch (error) {
-        res.status(500).send({ message: 'Error marking messages as seen', error });
+        console.error('Error marking messages as seen:', error);
+        res.status(500).send({ message: 'Internal server error' });
     }
 });
-
 
 router.delete('/data/:id', async (req, res) => {
     const { id } = req.params;
