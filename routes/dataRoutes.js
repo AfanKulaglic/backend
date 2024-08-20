@@ -25,7 +25,8 @@ const DataSchema = new mongoose.Schema({
             user: String,
             content: String,
             timestamp: { type: Date, default: Date.now },
-            toUser: String
+            toUser: String,
+            seen: { type: Boolean, default: false }  // Add this line
         }
     ]
 });
@@ -73,26 +74,58 @@ router.patch('/data/:id/messages', async (req, res) => {
             return res.status(404).send({ message: 'Friend data not found' });
         }
 
-        const messageExistsForFriend = updatedFriendData.messages.some(m => m._id === _id);
-        if (!messageExistsForFriend) {
+        const messageExistsForFriend = updatedFriendData.messages.find(m => m._id === _id);
+        if (messageExistsForFriend) {
+            messageExistsForFriend.seen = true;
+        } else {
             updatedFriendData.messages.push({ user, content, toUser, _id, timestamp });
-            await updatedFriendData.save();
         }
+        await updatedFriendData.save();
 
         const userData = await Data.findOne({ nickname: user });
         if (userData) {
-            const messageExistsForUser = userData.messages.some(m => m._id === _id);
+            const messageExistsForUser = userData.messages.find(m => m._id === _id);
             if (!messageExistsForUser) {
-                // Zadrži originalnu vrednost toUser umesto zamenjivanja sa userData.nickname
                 userData.messages.push({ user, content, toUser, _id, timestamp });
                 await userData.save();
             }
         }
 
-        io.emit('newMessage', { friendData: updatedFriendData, userData }); // Emitovanje događaja
+        io.emit('newMessage', { friendData: updatedFriendData, userData });
         res.status(200).send({ friendData: updatedFriendData, userData });
     } catch (error) {
         res.status(500).send({ message: 'Error updating data with message', error });
+    }
+});
+
+
+router.patch('/data/:id/markAsSeen', async (req, res) => {
+    const { id } = req.params;
+    const { user } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).send({ message: 'Invalid ID format' });
+    }
+    if (!user) {
+        return res.status(400).send({ message: 'User is missing' });
+    }
+
+    try {
+        const chatData = await Data.findById(id);
+        if (!chatData) {
+            return res.status(404).send({ message: 'Chat data not found' });
+        }
+
+        chatData.messages.forEach(msg => {
+            if (msg.toUser === user) {
+                msg.seen = true;
+            }
+        });
+
+        await chatData.save();
+        res.status(200).send(chatData);
+    } catch (error) {
+        res.status(500).send({ message: 'Error marking messages as seen', error });
     }
 });
 
