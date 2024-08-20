@@ -59,44 +59,49 @@ router.get('/data', async (req, res) => {
 
 router.patch('/data/:id/messages', async (req, res) => {
     const { id } = req.params;
-    const { user, content, toUser, _id, timestamp } = req.body;
+    const { user, _id, toUser } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).send({ message: 'Invalid ID format' });
     }
-    if (!user || !content || !toUser || !_id || !timestamp) {
-        return res.status(400).send({ message: 'User, content, recipient user, ID, or timestamp is missing' });
+    if (!user || !_id || !toUser) {
+        return res.status(400).send({ message: 'User, ID, or recipient user is missing' });
     }
 
     try {
-        const updatedFriendData = await Data.findById(id);
-        if (!updatedFriendData) {
+        const friendData = await Data.findById(id);
+        if (!friendData) {
             return res.status(404).send({ message: 'Friend data not found' });
         }
 
-        const messageExistsForFriend = updatedFriendData.messages.find(m => m._id === _id);
-        if (messageExistsForFriend) {
-            messageExistsForFriend.seen = true;
-        } else {
-            updatedFriendData.messages.push({ user, content, toUser, _id, timestamp });
-        }
-        await updatedFriendData.save();
+        // Ažurirajte status za prijatelja
+        friendData.messages.forEach(message => {
+            if (message._id === _id) {
+                message.seen = true;
+            }
+        });
+        await friendData.save();
 
         const userData = await Data.findOne({ nickname: user });
         if (userData) {
-            const messageExistsForUser = userData.messages.find(m => m._id === _id);
-            if (!messageExistsForUser) {
-                userData.messages.push({ user, content, toUser, _id, timestamp });
-                await userData.save();
-            }
+            // Ažurirajte status za korisnika
+            userData.messages.forEach(message => {
+                if (message._id === _id) {
+                    message.seen = true;
+                }
+            });
+            await userData.save();
         }
 
-        io.emit('newMessage', { friendData: updatedFriendData, userData });
-        res.status(200).send({ friendData: updatedFriendData, userData });
+        // Emitujte događaj za ažurirane podatke
+        io.emit('updateMessages', { friendData, userData });
+
+        res.status(200).send({ friendData, userData });
     } catch (error) {
         res.status(500).send({ message: 'Error updating data with message', error });
     }
 });
+
 
 
 router.patch('/data/:id/markAsSeen', async (req, res) => {
