@@ -26,7 +26,7 @@ const DataSchema = new mongoose.Schema({
             content: String,
             timestamp: { type: Date, default: Date.now },
             toUser: String,
-            seen: { type: Boolean, default: false } // Dodajemo polje `seen`
+            seen: { type: Boolean, default: false }  // Add this line
         }
     ]
 });
@@ -74,25 +74,21 @@ router.patch('/data/:id/messages', async (req, res) => {
             return res.status(404).send({ message: 'Friend data not found' });
         }
 
-        // Ažuriramo `seen` na `true` za sve poruke koje su poslali korisnici
-        updatedFriendData.messages.forEach(message => {
-            if (message.toUser === user) {
-                message.seen = true;
-            }
-        });
-
-        // Sačuvaj ažurirane podatke za prijatelja
+        const messageExistsForFriend = updatedFriendData.messages.find(m => m._id === _id);
+        if (messageExistsForFriend) {
+            messageExistsForFriend.seen = true;
+        } else {
+            updatedFriendData.messages.push({ user, content, toUser, _id, timestamp });
+        }
         await updatedFriendData.save();
 
-        // Ažuriraj `seen` status za korisnika
         const userData = await Data.findOne({ nickname: user });
         if (userData) {
-            userData.messages.forEach(message => {
-                if (message.toUser === friendUsername) {
-                    message.seen = true;
-                }
-            });
-            await userData.save();
+            const messageExistsForUser = userData.messages.find(m => m._id === _id);
+            if (!messageExistsForUser) {
+                userData.messages.push({ user, content, toUser, _id, timestamp });
+                await userData.save();
+            }
         }
 
         io.emit('newMessage', { friendData: updatedFriendData, userData });
@@ -101,7 +97,6 @@ router.patch('/data/:id/messages', async (req, res) => {
         res.status(500).send({ message: 'Error updating data with message', error });
     }
 });
-
 
 
 router.patch('/data/:id/markAsSeen', async (req, res) => {
