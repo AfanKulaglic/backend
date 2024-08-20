@@ -117,7 +117,7 @@ router.patch('/data/:id/markAsSeen', async (req, res) => {
         }
 
         chatData.messages.forEach(msg => {
-            if (msg.toUser === user) {
+            if (msg.user === user) {
                 msg.seen = true;
             }
         });
