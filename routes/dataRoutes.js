@@ -25,7 +25,8 @@ const DataSchema = new mongoose.Schema({
             user: String,
             content: String,
             timestamp: { type: Date, default: Date.now },
-            toUser: String
+            toUser: String,
+            seen: { type: Boolean, default: false } // Dodano polje "seen"
         }
     ]
 });
@@ -36,14 +37,14 @@ router.post('/data', async (req, res) => {
     try {
         const { nickname, image, email } = req.body;
         if (!nickname || !image || !email) {
-            return res.status(400).send({ message: 'Nickname, image URL, or email is missing' });
+            return res.status(400).send({ message: 'Nickname, URL slike ili email nedostaju' });
         }
         const newData = new Data({ nickname, image, email });
         await newData.save();
         res.status(201).send(newData);
     } catch (error) {
-        console.error('Error saving nickname, image, or email:', error.message);
-        res.status(500).send({ message: 'An error occurred while saving the data.' });
+        console.error('Greška pri spremanju nickname, slike ili email-a:', error.message);
+        res.status(500).send({ message: 'Došlo je do greške pri spremanju podataka.' });
     }
 });
 
@@ -52,7 +53,7 @@ router.get('/data', async (req, res) => {
         const data = await Data.find();
         res.status(200).send(data);
     } catch (error) {
-        res.status(500).send({ message: 'Error retrieving data', error });
+        res.status(500).send({ message: 'Greška pri preuzimanju podataka', error });
     }
 });
 
@@ -60,34 +61,27 @@ router.patch('/data/:id/messages', async (req, res) => {
     const { id } = req.params;
     const { user, content, toUser, _id, timestamp } = req.body;
 
-    // Proverite da li je ID u ispravnom formatu
     if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(400).send({ message: 'Invalid ID format' });
+        return res.status(400).send({ message: 'Nevažeći ID format' });
     }
-
-    // Proverite da li svi potrebni podaci postoje
     if (!user || !content || !toUser || !_id || !timestamp) {
-        return res.status(400).send({ message: 'User, content, recipient user, ID, or timestamp is missing' });
+        return res.status(400).send({ message: 'Korisnik, sadržaj, korisnik kojem je poruka upućena, ID ili vremenski pečat nedostaju' });
     }
 
     try {
-        // Pronađi prijatelja po ID-u
         const updatedFriendData = await Data.findById(id);
         if (!updatedFriendData) {
-            return res.status(404).send({ message: 'Friend data not found' });
+            return res.status(404).send({ message: 'Podaci prijatelja nisu pronađeni' });
         }
 
-        // Proveri da li poruka već postoji za prijatelja
         const messageExistsForFriend = updatedFriendData.messages.some(m => m._id === _id);
         if (!messageExistsForFriend) {
             updatedFriendData.messages.push({ user, content, toUser, _id, timestamp });
             await updatedFriendData.save();
         }
 
-        // Pronađi korisnika koji je poslao poruku
         const userData = await Data.findOne({ nickname: user });
         if (userData) {
-            // Proveri da li poruka već postoji za korisnika
             const messageExistsForUser = userData.messages.some(m => m._id === _id);
             if (!messageExistsForUser) {
                 userData.messages.push({ user, content, toUser, _id, timestamp });
@@ -95,27 +89,53 @@ router.patch('/data/:id/messages', async (req, res) => {
             }
         }
 
-        // Emituj događaj u realnom vremenu
-        io.emit('receiveMessage', { friendData: updatedFriendData, userData }); 
-
+        io.emit('newMessage', { friendData: updatedFriendData, userData }); // Emitovanje događaja
         res.status(200).send({ friendData: updatedFriendData, userData });
     } catch (error) {
-        console.error('Error updating data with message:', error.message);
-        res.status(500).send({ message: 'Error updating data with message', error });
+        res.status(500).send({ message: 'Greška pri ažuriranju podataka s porukom', error });
     }
 });
 
+router.patch('/data/:id/messages/seen', async (req, res) => {
+    const { id } = req.params;
+    const { messageId } = req.body;
 
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).send({ message: 'Nevažeći ID format' });
+    }
+    if (!messageId) {
+        return res.status(400).send({ message: 'ID poruke je obavezan' });
+    }
+
+    try {
+        const data = await Data.findById(id);
+        if (!data) {
+            return res.status(404).send({ message: 'Podaci nisu pronađeni' });
+        }
+
+        // Ažurirajte status "seen" za određenu poruku
+        const message = data.messages.id(messageId);
+        if (message) {
+            message.seen = true;
+            await data.save();
+            res.status(200).send(data);
+        } else {
+            res.status(404).send({ message: 'Poruka nije pronađena' });
+        }
+    } catch (error) {
+        res.status(500).send({ message: 'Greška pri ažuriranju statusa viđeno', error });
+    }
+});
 
 router.delete('/data/:id', async (req, res) => {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(400).send({ message: 'Invalid ID format' });
+        return res.status(400).send({ message: 'Nevažeći ID format' });
     }
     try {
         const deletedData = await Data.findByIdAndDelete(id);
         if (!deletedData) {
-            return res.status(404).send({ message: 'Data not found' });
+            return res.status(404).send({ message: 'Podaci nisu pronađeni' });
         }
         const imagePath = path.join(__dirname, '../uploads', path.basename(deletedData.image));
         if (deletedData.image && fs.existsSync(imagePath)) {
@@ -123,7 +143,7 @@ router.delete('/data/:id', async (req, res) => {
         }
         res.status(200).send(deletedData);
     } catch (error) {
-        res.status(500).send({ message: 'Error deleting data', error });
+        res.status(500).send({ message: 'Greška pri brisanju podataka', error });
     }
 });
 
