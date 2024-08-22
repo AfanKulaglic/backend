@@ -189,4 +189,5 @@ router.patch('/data/:id/updateImage', upload.single('image'), async (req, res) =
     }
 });
 
+
 module.exports = router;
