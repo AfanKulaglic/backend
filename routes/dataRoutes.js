@@ -150,4 +150,26 @@ router.delete('/data/:id', async (req, res) => {
     }
 });
 
+router.patch('/updateImage', async (req, res) => {
+    const { userId } = req.body;
+    const file = req.files?.image; // Ensure you handle the file upload correctly
+  
+    if (!file || !userId) {
+      return res.status(400).send({ message: 'Image file or userId is missing' });
+    }
+  
+    // Save the file and update the user record in the database
+    try {
+      const newImageUrl = `/uploads/${file.filename}`; // Adjust as needed
+      // Update the user's image URL in the database
+      // Example:
+      await User.findByIdAndUpdate(userId, { image: newImageUrl });
+  
+      res.status(200).send({ imageUrl: newImageUrl });
+    } catch (error) {
+      res.status(500).send({ message: 'Error updating image', error });
+    }
+  });
+  
+
 module.exports = router;
